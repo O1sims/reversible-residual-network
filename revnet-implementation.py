@@ -20,7 +20,10 @@ from tensorflow.keras.layers import Conv2D, BatchNormalization, ELU, Subtract, \
     Add, Lambda, Input, Reshape, Concatenate, Flatten, Dense
 
 
+
 enable_eager_execution()
+
+EPOCH_NUMBER = 20 # The higher the better! Each Epoch takes ~3 minutes
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 np.set_printoptions(suppress=True)
@@ -90,12 +93,14 @@ def unpool(tin):
     return ret
   return Lambda(_unpool)(tin)
 
+
 # Let's start
 in_dim = (x_train.shape[1], x_train.shape[2])
 x = in1 = Input(in_dim)
 x = Reshape((28,28,1))(x)
 chans = 1
 x1, x2 = x, x
+
 
 # Main
 x1, x2, l1 = revblock(x1, x2, chans)
@@ -109,6 +114,7 @@ chans *= 4
 x1, x2, l5 = revblock(x1, x2, chans)
 x1, x2, l6 = revblock(x1, x2, chans)
 
+
 # Exit
 x = Concatenate()([x1,x2])
 flat = Flatten(name="hidden")(x)
@@ -116,7 +122,8 @@ flat = Flatten(name="hidden")(x)
 bad_layer = Dense(2, use_bias=False)
 x = bad_layer(flat)
 
-# Invertibility loss
+
+# Invertibility Loss
 invert_layer = Lambda(lambda x: tf.matmul(x, tf.transpose(bad_layer.weights[0])))
 invert_layer_out = invert_layer(x)
 
@@ -130,13 +137,15 @@ m.compile('adam', loss, metrics=['accuracy'])
 rev = Model(m.inputs,[m.get_layer('hidden').output])
 rev.compile('sgd', 'mse')
 
-# invert
+
+# Invert
 x = in1 = Input((np.product(in_dim)*2,))
 x = Reshape((x_train.shape[1]//4,x_train.shape[2]//4,chans*2))(x)
 x1 = Lambda(lambda x: x[:, :, :, :chans])(x)
 x2 = Lambda(lambda x: x[:, :, :, chans:])(x)
 
-# inverted main
+
+# Inverted Main
 x1, x2 = unrevblock(x1, x2, l6)
 x1, x2 = unrevblock(x1, x2, l5)
 x1, x2 = map(unpool, [x1,x2])
@@ -146,12 +155,14 @@ x1, x2 = map(unpool, [x1,x2])
 x1, x2 = unrevblock(x1, x2, l2)
 x1, x2 = unrevblock(x1, x2, l1)
 
-# exit
+
+# Exit
 x1, x2 = map(Reshape(x_train.shape[1:]), [x1,x2])
 unrev = Model(in1, [x1,x2])
 unrev.compile('sgd', 'mse')
 
-# autoencoder loss
+
+# Measure Autoencoder loss
 in_dim = (x_train.shape[1], x_train.shape[2])
 x = in1 = Input(in_dim)
 x = rev(x)
@@ -165,10 +176,11 @@ ae.compile('adam', ['mse', 'mse'])
 
 ae.fit(x_train, [x_train, x_train],
        validation_data=(x_test, [x_test, x_test]),
-       batch_size=256, epochs=2)
+       batch_size=256, 
+       epochs=EPOCH_NUMBER)
 
 
-# test reversibility
+# Test Reversibility
 tol = 1e-4
 x_train_in = x_train[0:16]
 mid = rev.predict(x_train_in)
@@ -187,7 +199,8 @@ plt.imshow(np.concatenate([
   np.concatenate(x_train_xx_1, axis=1)
 ], axis=0))
 
-# through the autoencoder layer
+
+# The Autoencoder layer
 plt.figure(figsize=(16,16))
 xx = np.matmul(mid, bad_layer.weights[0].numpy())
 xx = np.matmul(xx, bad_layer.weights[0].numpy().T)
@@ -197,13 +210,13 @@ plt.imshow(np.concatenate([
   np.concatenate(xx_0, axis=1),
   np.concatenate(xx_1, axis=1)
 ], axis=0))
-    
-    
-    
-    
+
+
 mid = rev.predict(x_train, verbose=1, batch_size=1024)
 xx = np.matmul(mid, bad_layer.weights[0].numpy())
 
+
+# Plot matching accuracy
 for i in range(10):
   ll = xx[y_train[:, i] == 1]
   plt.scatter(ll[:, 0], ll[:, 1], s=1.0)
