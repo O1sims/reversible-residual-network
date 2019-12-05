@@ -23,7 +23,7 @@ from tensorflow.keras.layers import Conv2D, BatchNormalization, ELU, Subtract, \
 
 enable_eager_execution()
 
-EPOCH_NUMBER = 20 # The higher the better! Each Epoch takes ~3 minutes
+EPOCH_NUMBER = 10 # The higher the better! Each Epoch takes ~3 minutes
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 np.set_printoptions(suppress=True)
